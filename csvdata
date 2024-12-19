@@ -1,0 +1,163 @@
+using System;
+using System.Data.SQLite;
+using System.IO;
+
+class DataMigration
+{
+    private const string DatabaseFile = "HRSystem.db"; // データベースファイル名
+    private const string EmployeeCsv = "employees.csv"; // 社員情報CSV
+    private const string AttendanceCsv = "attendance.csv"; // 勤怠情報CSV
+
+    static void Main(string[] args)
+    {
+        // データベースを準備
+        PrepareDatabase();
+
+        // CSVデータをデータベースに移行
+        ImportEmployees(EmployeeCsv);
+        ImportAttendance(AttendanceCsv);
+
+        Console.WriteLine("CSVデータの移行が完了しました！");
+    }
+
+    // データベース準備（ファイル作成 & テーブル作成）
+    static void PrepareDatabase()
+    {
+        if (!File.Exists(DatabaseFile))
+        {
+            SQLiteConnection.CreateFile(DatabaseFile);
+            Console.WriteLine("データベースファイルを作成しました。");
+        }
+
+        using (var connection = new SQLiteConnection($"Data Source={DatabaseFile};Version=3;"))
+        {
+            connection.Open();
+
+            // 社員テーブル作成
+            var createEmployeesTable = @"
+                CREATE TABLE IF NOT EXISTS Employees (
+                    EmployeeID TEXT PRIMARY KEY,
+                    Name TEXT NOT NULL,
+                    Position TEXT,
+                    Department TEXT,
+                    Contact TEXT,
+                    Salary REAL
+                );";
+
+            // 勤怠テーブル作成
+            var createAttendanceTable = @"
+                CREATE TABLE IF NOT EXISTS Attendance (
+                    AttendanceID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EmployeeID TEXT NOT NULL,
+                    Date TEXT NOT NULL,
+                    ClockIn TEXT NOT NULL,
+                    ClockOut TEXT NOT NULL,
+                    FOREIGN KEY(EmployeeID) REFERENCES Employees(EmployeeID)
+                );";
+
+            using (var command = new SQLiteCommand(createEmployeesTable, connection))
+            {
+                command.ExecuteNonQuery();
+                Console.WriteLine("Employeesテーブルを準備しました。");
+            }
+
+            using (var command = new SQLiteCommand(createAttendanceTable, connection))
+            {
+                command.ExecuteNonQuery();
+                Console.WriteLine("Attendanceテーブルを準備しました。");
+            }
+        }
+    }
+
+    // 社員データのインポート
+    static void ImportEmployees(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            Console.WriteLine($"ファイルが見つかりません: {filePath}");
+            return;
+        }
+
+        using (var connection = new SQLiteConnection($"Data Source={DatabaseFile};Version=3;"))
+        {
+            connection.Open();
+
+            using (var transaction = connection.BeginTransaction())
+            {
+                using (var reader = new StreamReader(filePath))
+                {
+                    string line;
+                    reader.ReadLine(); // ヘッダー行をスキップ
+
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        var fields = line.Split(',');
+
+                        var commandText = @"
+                            INSERT OR IGNORE INTO Employees (EmployeeID, Name, Position, Department, Contact, Salary)
+                            VALUES (@EmployeeID, @Name, @Position, @Department, @Contact, @Salary);";
+
+                        using (var command = new SQLiteCommand(commandText, connection))
+                        {
+                            command.Parameters.AddWithValue("@EmployeeID", fields[0]);
+                            command.Parameters.AddWithValue("@Name", fields[1]);
+                            command.Parameters.AddWithValue("@Position", fields[2]);
+                            command.Parameters.AddWithValue("@Department", fields[3]);
+                            command.Parameters.AddWithValue("@Contact", fields[4]);
+                            command.Parameters.AddWithValue("@Salary", fields[5]);
+
+                            command.ExecuteNonQuery();
+                        }
+                    }
+                }
+                transaction.Commit();
+            }
+        }
+        Console.WriteLine("社員データをインポートしました。");
+    }
+
+    // 勤怠データのインポート
+    static void ImportAttendance(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            Console.WriteLine($"ファイルが見つかりません: {filePath}");
+            return;
+        }
+
+        using (var connection = new SQLiteConnection($"Data Source={DatabaseFile};Version=3;"))
+        {
+            connection.Open();
+
+            using (var transaction = connection.BeginTransaction())
+            {
+                using (var reader = new StreamReader(filePath))
+                {
+                    string line;
+                    reader.ReadLine(); // ヘッダー行をスキップ
+
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        var fields = line.Split(',');
+
+                        var commandText = @"
+                            INSERT OR IGNORE INTO Attendance (EmployeeID, Date, ClockIn, ClockOut)
+                            VALUES (@EmployeeID, @Date, @ClockIn, @ClockOut);";
+
+                        using (var command = new SQLiteCommand(commandText, connection))
+                        {
+                            command.Parameters.AddWithValue("@EmployeeID", fields[0]);
+                            command.Parameters.AddWithValue("@Date", fields[1]);
+                            command.Parameters.AddWithValue("@ClockIn", fields[2]);
+                            command.Parameters.AddWithValue("@ClockOut", fields[3]);
+
+                            command.ExecuteNonQuery();
+                        }
+                    }
+                }
+                transaction.Commit();
+            }
+        }
+        Console.WriteLine("勤怠データをインポートしました。");
+    }
+}

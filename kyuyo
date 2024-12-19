@@ -1,0 +1,188 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+
+class EmployeeManagementSystem
+{
+    // ファイルパス
+    private const string EmployeeFile = "employees.csv";
+    private const string AttendanceFile = "attendance.csv";
+
+    // フィールド名
+    private static readonly string[] EmployeeFields = { "EmployeeID", "Name", "Position", "Department", "Contact", "Salary" };
+    private static readonly string[] AttendanceFields = { "EmployeeID", "Date", "ClockIn", "ClockOut" };
+
+    // メインメニュー
+    static void Main(string[] args)
+    {
+        while (true)
+        {
+            Console.WriteLine("\n=== 人事システム メニュー ===");
+            Console.WriteLine("1. 社員情報の登録");
+            Console.WriteLine("2. 社員情報の表示");
+            Console.WriteLine("3. 勤怠登録");
+            Console.WriteLine("4. 勤怠記録の表示");
+            Console.WriteLine("5. 給与計算");
+            Console.WriteLine("6. 終了");
+            Console.Write("選択してください: ");
+            string choice = Console.ReadLine();
+
+            switch (choice)
+            {
+                case "1":
+                    AddEmployee();
+                    break;
+                case "2":
+                    ListEmployees();
+                    break;
+                case "3":
+                    RecordAttendance();
+                    break;
+                case "4":
+                    ListAttendance();
+                    break;
+                case "5":
+                    CalculateSalary();
+                    break;
+                case "6":
+                    Console.WriteLine("システムを終了します。");
+                    return;
+                default:
+                    Console.WriteLine("無効な選択です。もう一度選んでください。");
+                    break;
+            }
+        }
+    }
+
+    // 社員情報の登録
+    static void AddEmployee()
+    {
+        Console.WriteLine("\n=== 社員情報登録 ===");
+        var employee = new Dictionary<string, string>();
+
+        foreach (var field in EmployeeFields)
+        {
+            Console.Write($"{field} を入力してください: ");
+            employee[field] = Console.ReadLine();
+        }
+
+        // CSVに保存
+        SaveToCsv(EmployeeFile, EmployeeFields, employee);
+        Console.WriteLine("\n社員情報を登録しました。\n");
+    }
+
+    // 社員情報の表示
+    static void ListEmployees()
+    {
+        Console.WriteLine("\n=== 社員情報一覧 ===");
+        PrintCsv(EmployeeFile);
+    }
+
+    // 勤怠登録
+    static void RecordAttendance()
+    {
+        Console.WriteLine("\n=== 勤怠登録 ===");
+        Console.Write("社員IDを入力してください: ");
+        string employeeId = Console.ReadLine();
+
+        Console.Write("出勤時間を入力してください (HH:mm): ");
+        string clockIn = Console.ReadLine();
+
+        Console.Write("退勤時間を入力してください (HH:mm): ");
+        string clockOut = Console.ReadLine();
+
+        var attendance = new Dictionary<string, string>
+        {
+            { "EmployeeID", employeeId },
+            { "Date", DateTime.Now.ToString("yyyy-MM-dd") },
+            { "ClockIn", clockIn },
+            { "ClockOut", clockOut }
+        };
+
+        SaveToCsv(AttendanceFile, AttendanceFields, attendance);
+        Console.WriteLine("\n勤怠を登録しました。\n");
+    }
+
+    // 勤怠記録の表示
+    static void ListAttendance()
+    {
+        Console.WriteLine("\n=== 勤怠記録 ===");
+        PrintCsv(AttendanceFile);
+    }
+
+    // 給与計算
+    static void CalculateSalary()
+    {
+        Console.WriteLine("\n=== 給与計算 ===");
+
+        if (!File.Exists(EmployeeFile) || !File.Exists(AttendanceFile))
+        {
+            Console.WriteLine("社員情報または勤怠記録が不足しています。\n");
+            return;
+        }
+
+        var employees = File.ReadAllLines(EmployeeFile).Skip(1).Select(line => line.Split(',')).ToList();
+        var attendance = File.ReadAllLines(AttendanceFile).Skip(1).Select(line => line.Split(',')).ToList();
+
+        foreach (var employee in employees)
+        {
+            string employeeId = employee[0];
+            string name = employee[1];
+            decimal baseSalary = decimal.Parse(employee[5]);
+            decimal overtimePay = 0;
+
+            var employeeAttendance = attendance.Where(a => a[0] == employeeId);
+
+            foreach (var record in employeeAttendance)
+            {
+                DateTime clockIn = DateTime.ParseExact(record[2], "HH:mm", CultureInfo.InvariantCulture);
+                DateTime clockOut = DateTime.ParseExact(record[3], "HH:mm", CultureInfo.InvariantCulture);
+                TimeSpan workHours = clockOut - clockIn;
+
+                // 8時間以上の労働を時間外労働とみなす
+                if (workHours.TotalHours > 8)
+                {
+                    overtimePay += (decimal)(workHours.TotalHours - 8) * 1000; // 1時間あたり1000円
+                }
+            }
+
+            decimal totalSalary = baseSalary + overtimePay;
+            Console.WriteLine($"社員: {name}, 総給与: {totalSalary:C}, 残業代: {overtimePay:C}");
+        }
+    }
+
+    // CSVに保存
+    static void SaveToCsv(string filePath, string[] fields, Dictionary<string, string> data)
+    {
+        bool fileExists = File.Exists(filePath);
+        using (var writer = new StreamWriter(filePath, append: true))
+        {
+            if (!fileExists)
+            {
+                writer.WriteLine(string.Join(",", fields)); // ヘッダー
+            }
+            writer.WriteLine(string.Join(",", fields.Select(field => data[field])));
+        }
+    }
+
+    // CSVを表示
+    static void PrintCsv(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            Console.WriteLine("データが存在しません。\n");
+            return;
+        }
+
+        using (var reader = new StreamReader(filePath))
+        {
+            string line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                Console.WriteLine(line);
+            }
+        }
+    }
+}

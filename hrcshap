@@ -1,0 +1,136 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
+class EmployeeManagementSystem
+{
+    // 定数: ファイルパスとフィールド名
+    private const string EmployeeFile = "employees.csv";
+    private static readonly string[] EmployeeFields = { "EmployeeID", "Name", "Position", "Department", "Contact", "Salary" };
+
+    // メインメニュー
+    static void Main(string[] args)
+    {
+        while (true)
+        {
+            Console.WriteLine("\n=== 人事システム メニュー ===");
+            Console.WriteLine("1. 社員情報の登録");
+            Console.WriteLine("2. 社員情報の表示");
+            Console.WriteLine("3. 社員情報の検索");
+            Console.WriteLine("4. 終了");
+            Console.Write("選択してください: ");
+            string choice = Console.ReadLine();
+
+            switch (choice)
+            {
+                case "1":
+                    AddEmployee();
+                    break;
+                case "2":
+                    ListEmployees();
+                    break;
+                case "3":
+                    SearchEmployee();
+                    break;
+                case "4":
+                    Console.WriteLine("システムを終了します。");
+                    return;
+                default:
+                    Console.WriteLine("無効な選択です。もう一度選んでください。");
+                    break;
+            }
+        }
+    }
+
+    // 社員情報の登録
+    static void AddEmployee()
+    {
+        Console.WriteLine("\n=== 社員情報登録 ===");
+        var employee = new Dictionary<string, string>();
+
+        foreach (var field in EmployeeFields)
+        {
+            Console.Write($"{field} を入力してください: ");
+            employee[field] = Console.ReadLine();
+        }
+
+        // データをCSVに保存
+        bool fileExists = File.Exists(EmployeeFile);
+        using (var writer = new StreamWriter(EmployeeFile, append: true))
+        {
+            if (!fileExists)
+            {
+                writer.WriteLine(string.Join(",", EmployeeFields)); // ヘッダーを書き込む
+            }
+            writer.WriteLine(string.Join(",", EmployeeFields.Select(field => employee[field])));
+        }
+
+        Console.WriteLine("\n社員情報を登録しました。\n");
+    }
+
+    // 社員情報の表示
+    static void ListEmployees()
+    {
+        Console.WriteLine("\n=== 社員情報一覧 ===");
+
+        if (!File.Exists(EmployeeFile))
+        {
+            Console.WriteLine("社員情報がまだ登録されていません。\n");
+            return;
+        }
+
+        using (var reader = new StreamReader(EmployeeFile))
+        {
+            string line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                Console.WriteLine(line);
+            }
+        }
+    }
+
+    // 社員情報の検索
+    static void SearchEmployee()
+    {
+        Console.Write("\n検索する社員IDを入力してください: ");
+        string searchId = Console.ReadLine();
+
+        if (!File.Exists(EmployeeFile))
+        {
+            Console.WriteLine("社員情報がまだ登録されていません。\n");
+            return;
+        }
+
+        using (var reader = new StreamReader(EmployeeFile))
+        {
+            string line = reader.ReadLine(); // ヘッダーを読み飛ばす
+            if (line == null)
+            {
+                Console.WriteLine("社員情報がまだ登録されていません。\n");
+                return;
+            }
+
+            bool found = false;
+            while ((line = reader.ReadLine()) != null)
+            {
+                var fields = line.Split(',');
+                if (fields[0] == searchId) // EmployeeIDが一致
+                {
+                    Console.WriteLine("\n=== 検索結果 ===");
+                    for (int i = 0; i < EmployeeFields.Length; i++)
+                    {
+                        Console.WriteLine($"{EmployeeFields[i]}: {fields[i]}");
+                    }
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                Console.WriteLine("該当する社員が見つかりません。\n");
+            }
+        }
+    }
+}
